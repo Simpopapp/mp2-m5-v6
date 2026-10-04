@@ -1,1 +1,944 @@
-null
+# PRD v2: Meridiano
+
+**Conhecimento não se organiza. Se forma.**
+
+| Campo | Valor |
+|---|---|
+| Versão | 2.0, substitui a 1.0 onde houver conflito |
+| Data | 03/10/2026 |
+| Status | Rascunho para revisão e decisão de Go/No-Go da Prova de Beleza (seção 14) |
+| Stack inicial | TanStack Start, Router, Query, DB, Store, Pacer + engine própria de mundo (Rust/WASM + WebGPU) |
+| Plataformas | Web desktop e mobile, PWA; nativo na fase 5 |
+| Idiomas | pt-BR, en, es |
+
+---
+
+## 0. Sobre esta versão
+
+A v1 descrevia um bom app de notas com uma pele 3D. Era correta e genérica: qualquer concorrente poderia copiá-la em um trimestre. A v2 troca a pele por uma tese.
+
+| O que faltava na v1 | O que a v2 faz |
+|---|---|
+| O mapa era uma visualização estática dos dados | O território é um **mundo simulado**: sedimenta, ergue montanhas, erode, tem rios, clima e estações. O comportamento do usuário *é* a geologia |
+| Efeitos bonitos sem função | Regra de ouro: **nada é decorativo**. Cada efeito visual codifica um dado (seção 2) |
+| Telas descritas, momentos não | **12 momentos "uau"** com roteiro quadro a quadro: tempo, easing, shader, som, tato e versão reduzida (seção 5) |
+| Sem ritual nem hábito | Rituais diário, semanal, sazonal e anual, sem culpa e sem sequências punitivas (seção 4) |
+| Solitário | Mundo compartilhado: **Atlas Mundi** (todas as cartas públicas costuradas em um planeta explorável), **Turmas** e **Fronteiras** entre territórios |
+| Interface convencional | A interface vira **instrumentação cartográfica**: bússola funcional, escala semântica, legenda que é o painel de camadas, lentes |
+| Direção de arte em parágrafo | Direção de arte, linguagem de movimento (dois relógios), som, tato e voz especificados (seção 6) e tokens e shaders de referência (seção 7) |
+| Sem prova de viabilidade | **Prova de Beleza** de 6 semanas com critérios de saída antes de construir o resto (seção 14) |
+
+**Escopo deste documento:** a v2 é autossuficiente quanto a visão, mundo, experiência, tecnologia, crescimento e roadmap. Para telas utilitárias (preços, ajuda, blog, changelog, notificações, cobrança, console, importar/exportar) permanecem válidas as especificações da v1, aplicadas as melhorias da tabela da seção 8.
+
+---
+
+## 1. A grande ideia
+
+### 1.1 Tese
+
+Todo conhecimento pessoal tem a forma de uma paisagem, só que ninguém consegue vê-la. O Meridiano a torna visível e, mais importante, **viva**:
+
+- O que você captura **se deposita** como sedimento.
+- Quando duas áreas distantes se conectam, **placas colidem** e nasce uma cordilheira.
+- O que você deixa de revisitar **erode** devagar.
+- Citações viram **rios** que mostram de onde veio cada ideia e o que ela alimenta.
+- O que você ainda não explorou fica sob **névoa**, e o horizonte mostra a **terra incógnita** para onde sua trajetória aponta.
+
+A pessoa deixa de "manter notas" e passa a **cultivar um mundo**. Cada captura, conexão e revisão tem consequência visível, bonita e informativa.
+
+### 1.2 Declaração de posicionamento
+
+Para quem aprende e cria o tempo todo e sente que o que sabe está soterrado, o Meridiano é o primeiro espaço de conhecimento que se comporta como um lugar: você o vê crescer, percorre, esquece e redescobre. Ao contrário de apps de notas que acumulam, o Meridiano mostra a forma do que você sabe, o que está se perdendo e para onde ir.
+
+### 1.3 Por que isso é difícil de copiar
+
+1. **Simulação determinística sobre o histórico de eventos** (um motor próprio, não uma biblioteca de grafos).
+2. **Linguagem visual cuja semântica já está treinada nos usuários** (mapas, relevo, clima): sem manual.
+3. **Efeito de rede**: Atlas Mundi e Turmas só existem com massa de cartas publicadas.
+4. **Dado raro**: curva real de retenção por tema, ao lado da estrutura do conhecimento.
+
+### 1.4 Frase de produto para toda a equipe
+
+> "Se um efeito não diz algo verdadeiro sobre o conhecimento da pessoa, ele não entra."
+
+---
+
+## 2. Regra de ouro: nada é decorativo
+
+Toda impressão visual, sonora ou tátil precisa mapear para um dado. Esta tabela é parte do sistema de design e é verificada em revisão de design.
+
+| Efeito | O que significa | Dado de origem |
+|---|---|---|
+| Altitude | Domínio multiplicado por profundidade em um tema | Revisões, extensão, conexões, qualidade |
+| Cor do estrato (no corte) | Tipo e época do marco | `type`, `created_at` |
+| Densidade de curvas de nível | Inclinação: quão rápido o domínio muda entre temas vizinhos | Gradiente da altura |
+| Pico nevado | Conhecimento consolidado e estável | Alta retrievability sustentada |
+| Vegetação | Revisão frequente e saudável | Frequência de revisão |
+| Desbotar e suavizar relevo | Erosão: baixa probabilidade de lembrar | Retrievability (FSRS) |
+| Névoa | Fração inexplorada em relação ao objetivo | Distância semântica ao Farol, densidade |
+| Rios | Proveniência e fluxo de citações | Grafo de citação e uso |
+| Largura do rio | Quanto aquela fonte alimenta | Número de derivados |
+| Brilho de magma (momentâneo) | Conexão interdisciplinar nova | Evento de colisão de placas |
+| Ondas na costa | Capturas recentes ainda sem organização | Campo não processado |
+| Nuvens | Troca de contexto recente | Variação de tema por hora |
+| Foco tilt-shift (maquete) | Item em foco; o resto é "miniatura" | Seleção ativa |
+| Farol no horizonte | Objetivo ativo | Expedição ou meta |
+| Direção do Norte na bússola | Rumo ao objetivo ativo | Vetor ao Farol |
+| Estação (paleta e luz) | Fase do ciclo de trabalho | Calendário do usuário |
+| Brasas (Acampamento) | Tempo de foco restante | Sessão |
+
+---
+
+## 3. Mundo Vivo: os sete sistemas
+
+O mundo é calculado por um motor determinístico a partir do **registro de eventos** (captura, edição, conexão, revisão, citação, publicação). Os mesmos eventos geram o mesmo mundo em qualquer dispositivo, e é isso que permite a Maré (viagem no tempo) e a colaboração.
+
+### 3.1 Sedimentação (captura)
+
+- **Regra:** cada marco deposita sedimento na posição semântica. A quantidade é proporcional à **informação nova** (distância ao conteúdo existente, tamanho útil), não ao tamanho bruto. Conteúdo redundante **compacta** (vira camada fina) em vez de empilhar.
+- **Visual:** partículas finas descem sobre a área; uma linha de camada marca o depósito (visível no Corte).
+- **UX:** capturar nunca exige escolher destino; a área se atualiza e o usuário vê *onde* a ideia caiu.
+- **Parâmetros:** `k_novidade`, `k_tamanho`, `limiar_compactação`.
+
+### 3.2 Tectônica (conexão)
+
+- **Regra:** quando dois agrupamentos distantes acumulam pelo menos N caminhos aceitos (padrão 3), ocorre **orogenia**: uma cordilheira se ergue entre eles. Quanto mais distantes os temas, mais alta a serra.
+- **Visual:** rachaduras luminosas no solo, ergue-se a crista, poeira, um brilho de magma que esfria em segundos.
+- **UX:** o Norte **nomeia a formação** ("Serra da Evidência: Estatística encontra Nutrição") e propõe um marco-síntese. É o momento M3.
+- **Valor real:** premia e evidencia o pensamento interdisciplinar, onde nascem as boas ideias.
+
+### 3.3 Erosão (esquecimento)
+
+- **Regra:** a altitude de cada área é multiplicada por um fator de erosão derivado da retrievability média dos marcos (FSRS). Revisar, usar em escrita ou citar **reergue** a área.
+- **Visual:** relevo suaviza, cores desbotam, rios secam aos poucos; revisar faz **brotar vegetação** e a cor volta.
+- **Salvaguardas éticas:** erosão é informação, nunca castigo. Piso de 70% da altitude original. Nunca apaga dados. **Permafrost:** o usuário congela regiões arquivadas. Interruptor global "Pausar erosão" (férias, doença).
+- **UX:** nenhuma notificação punitiva. O convite é "esta serra está desgastando; 10 minutos a reerguem".
+
+### 3.4 Hidrologia (proveniência)
+
+- **Regra:** citações e usos formam um grafo de fluxo. Fontes muito usadas são **nascentes**; os trabalhos derivados são o curso do rio; o conjunto que alimenta um artigo é sua **bacia**.
+- **Visual:** rios em splines que seguem o relevo, largura proporcional ao fluxo, afluentes se juntando.
+- **Valor real:** "de onde veio esta ideia?" e "o que depende desta fonte?" respondidos em um olhar. Útil para pesquisa, jornalismo, direito e produto.
+
+### 3.5 Clima (contexto atual)
+
+- **Regra:** o céu reflete a atividade recente. Foco em um tema deixa o céu limpo; troca constante de contexto traz nuvens; muita captura sem organização traz ondas na costa.
+- **Visual:** nuvens volumétricas leves (raymarch barato), luz que acompanha a hora local.
+- **Valor real:** espelho honesto do dia. Dados 100% locais; desligável.
+
+### 3.6 Estações (ritmo longo)
+
+- **Regra:** o ano tem quatro estações do usuário (configuráveis), cada uma com um ritual:
+  - **Primavera:** plantar metas e Faróis.
+  - **Verão:** execução; paleta quente e luz longa.
+  - **Outono:** **Colheita**: revisão, síntese e carta publicável (M10).
+  - **Inverno:** poda e arquivamento; permafrost sugerido.
+- **Visual:** gradação de cor e luz da estação aplicada ao mundo inteiro.
+
+### 3.7 Exploração e Névoa
+
+- **Regra:** o Norte calcula a **terra incógnita**: temas adjacentes à sua trajetória e ao Farol que você nunca tocou. Aparecem como costas distantes no horizonte. Revelar exige escrever, estudar ou conectar.
+- **Visual:** a névoa se dissipa com uma frente de luz ao revelar (M4).
+- **Valor real:** transforma "o que eu não sei" em lugar, com direção e distância.
+
+### 3.8 Esculpir (intenção do usuário)
+
+O mundo é calculado, mas a pessoa manda: com um gesto (pinça para cima ou "pincel" na prancheta) o usuário **esculpe** a altitude de uma área para sinalizar importância. A simulação respeita esses **pinos** como intenção. Esculpir também é a forma de ensinar o Norte o que importa.
+
+---
+
+## 4. Loop de produto e rituais
+
+```
+Capturar → Sedimentar → Conectar → Explorar → Agir → Revisitar
+   ↑                                                      │
+   └────────────── o mundo muda de forma ←────────────────┘
+```
+
+| Ritmo | Ritual | Duração | O que a pessoa faz | O que o mundo faz |
+|---|---|---|---|---|
+| Diário | **Nascer do sol** | até 2 min | Abre o app, vê o que mudou "durante a noite", faz uma revisão curta e uma captura | Mostra erosão, rios novos, sugestão do Norte e um passo para a névoa mais próxima |
+| Diário | **Poente** (opcional) | 1 min | Fecha o dia com uma linha | Registra no Diário de Bordo e ajusta o clima |
+| Semanal | **Travessia** | 30 min | Revisa a semana, escolhe a próxima expedição | Relatório de relevo, formações novas, névoa prioritária |
+| Sazonal | **Colheita** | 1 a 2 h | Sintetiza a estação, publica uma carta | Gera "carta da estação" com selo e linha do tempo |
+| Anual | **Meu Ano em Relevo** | 3 min | Assiste e compartilha | Time-lapse do ano e estatísticas (M11) |
+
+**Princípios do hábito (sem dark patterns):**
+
+- Sem sequências punitivas, sem contadores de culpa, sem rankings por padrão.
+- A "recompensa" é o próprio mundo ficando mais rico, nunca pontos arbitrários.
+- Máximo de **um momento uau por sessão**. Raridade preserva o encanto.
+- Todo ritual pode ser pulado sem consequência.
+
+---
+
+## 5. Os 12 momentos "uau"
+
+Formato: gatilho, coreografia com tempos, som e tato, versão reduzida e acessível, e como medimos. **Dois relógios** (seção 6.3): resposta ao gesto usa tempo humano (120 a 280 ms, molas); eventos do mundo usam tempo geológico (1,2 a 4 s, inércia).
+
+### M1. Primeira terra (onboarding)
+- **Gatilho:** a pessoa responde à primeira pergunta ("o que você quer dominar?").
+- **Coreografia:** t=0 oceano calmo em tilt-shift, horizonte alto. t=0,4 s a resposta vira um nome gravado na água. t=0,9 a 2,8 s o fundo do mar sobe, a costa se forma, a água recua, a primeira ilha emerge com curvas de nível se desenhando de dentro para fora. t=2,8 a 3,6 s a câmera desce e o primeiro marco pousa como bandeira.
+- **Som e tato:** swell grave que se abre em pentatônica; um toque seco ao pousar a bandeira.
+- **Reduzido:** crossfade para a ilha já formada, sem movimento de câmera.
+- **Mede:** conclusão do onboarding; tempo até o primeiro marco.
+
+### M2. Sedimentação (captura)
+- **Gatilho:** enviar uma captura.
+- **Coreografia:** t=0 a 0,18 s o texto se condensa em uma bandeira; t=0,18 a 0,6 s voa em arco até a área semântica correta (a câmera acompanha de leve); t=0,6 a 1,6 s partículas descem e uma linha de camada se acende e esfria.
+- **Som e tato:** tique granular (areia) e vibração curta.
+- **Reduzido:** a bandeira surge no lugar com realce de 400 ms.
+- **Mede:** capturas por usuário por semana; percentual com visualização do pouso.
+
+### M3. Orogenia (conexão interdisciplinar)
+- **Gatilho:** o N-ésimo caminho aceito liga dois agrupamentos distantes.
+- **Coreografia:** t=0 a 0,5 s a câmera recua e inclina; t=0,5 a 1,2 s rachaduras luminosas correm entre os dois polos; t=1,2 a 3,6 s a cordilheira se ergue com poeira e brilho de magma que esfria em âmbar, depois rocha; t=3,6 s a serra recebe nome em etiqueta curva, escrita à tinta.
+- **Som e tato:** swell sub-grave com harmônico de violoncelo; pulso tátil de duas batidas.
+- **Reduzido:** a serra aparece com contorno realçado e o card de nome.
+- **Mede:** conexões entre áreas distantes por usuário; marcos-síntese criados após o evento.
+
+### M4. Dissipar da névoa
+- **Gatilho:** concluir um marco, revisão ou estudo em área sob névoa.
+- **Coreografia:** uma frente de luz varre a área em 1,8 s; a névoa se recolhe em bancos; a cor volta; novas curvas se desenham.
+- **Som e tato:** pad aéreo que se abre; vibração suave e longa.
+- **Reduzido:** a névoa some com fade e uma linha de texto confirma ("Região explorada: 12 marcos").
+- **Mede:** áreas reveladas por mês; tempo entre ver a névoa e agir.
+
+### M5. Voo do Norte
+- **Gatilho:** uma resposta do Norte com citações.
+- **Coreografia:** a agulha da bússola gira durante a busca (rumo e velocidade refletem a confiança); ao responder, uma **câmera cinematográfica** faz um voo contínuo pelos marcos citados, com regras de corte (máx. 3 s por parada, sem rolagem de câmera, horizonte estável). Em cada parada surge um trecho da fonte em itálico.
+- **Som e tato:** pad isóbara discreto; tique de bronze a cada parada.
+- **Reduzido:** lista de citações com mini-mapa e botão "Ver no mapa" (câmera sem animação).
+- **Mede:** percentual de respostas com clique em citação; uso de "Mostre-me no mapa".
+
+### M6. Lente topográfica (landing)
+- **Gatilho:** mover o cursor ou o dedo sobre o relevo da landing.
+- **Coreografia:** sob a lente (raio ~120 px) o intervalo das curvas cai a 25%, as curvas se adensam, prévias de marcos flutuam em vidro de bússola; ao sair, tudo relaxa em 500 ms.
+- **Som e tato:** (opcional) tom que sobe com a altitude sob a lente.
+- **Reduzido:** a lente aparece em ponto fixo no hero com botão "Mover lente" por teclado.
+- **Mede:** tempo de engajamento no hero; cliques em "Experimentar".
+
+### M7. Rios de proveniência
+- **Gatilho:** selecionar uma citação ou o botão "De onde veio isto?".
+- **Coreografia:** a água corre do marco selecionado montante acima, sobe aos afluentes até as nascentes, e depois jusante abaixo mostrando o que depende dele; os marcos tocados pulsam em sequência.
+- **Som e tato:** filtro de ruído que sobe e desce com o fluxo.
+- **Reduzido:** árvore de proveniência (lista expansível) com destaque no mapa.
+- **Mede:** uso do botão; marcos de origem adicionados depois.
+
+### M8. Maré do tempo
+- **Gatilho:** arrastar o controle de tempo.
+- **Coreografia:** o nível da água sobe e desce de acordo com a data; marcos posteriores se dissolvem em partículas; o relevo se reconfigura; um time-lapse reproduz meses em 8 s com a posição das serras marcada.
+- **Som e tato:** maré em ruído filtrado; cliques por mês.
+- **Reduzido:** seletor de datas com snapshots estáticos (três pontos: início, meio, hoje).
+- **Mede:** uso da Maré; exportações de time-lapse.
+
+### M9. Carimbo (publicar)
+- **Gatilho:** confirmar "Publicar".
+- **Coreografia:** a moldura do mapa recebe margem dupla; um selo de tinta é pressionado (squash and stretch de 160 ms), a tinta se espalha em máscara pelo mapa e fixa; o link vira um cartão que se dobra e voa ao botão de copiar.
+- **Som e tato:** carimbo (madeira e papel); vibração firme.
+- **Reduzido:** selo aparece estático com confirmação textual.
+- **Mede:** cartas publicadas; compartilhamentos.
+
+### M10. Colheita (fim de estação)
+- **Gatilho:** abertura do ritual do outono.
+- **Coreografia:** a luz muda para dourada; as áreas mais altas "frutificam" (marcos-chave se destacam); a pessoa os recolhe para uma carta; o Norte propõe a síntese; ao publicar, M9.
+- **Som e tato:** harmonia em tons maiores, suave.
+- **Reduzido:** painel de síntese com lista dos marcos-chave.
+- **Mede:** colheitas concluídas; cartas da estação publicadas.
+
+### M11. Meu Ano em Relevo
+- **Gatilho:** dezembro ou sob demanda.
+- **Coreografia:** time-lapse de 40 s do ano com legendas curtas e estatísticas ("3 serras nasceram", "14 áreas reerguidas", "2 costas descobertas"), terminando na ilha do usuário em corte estratigráfico; exporta em vídeo vertical e imagem.
+- **Som e tato:** trilha generativa composta pelos eventos do ano.
+- **Reduzido:** carrossel de imagens com texto.
+- **Mede:** compartilhamentos; novos usuários vindos do compartilhamento.
+
+### M12. Encontro (colaboração e fronteira)
+- **Gatilho:** dois exploradores entram no mesmo território ou dois territórios iniciam uma fusão.
+- **Coreografia:** os dois se avistam como silhuetas com bússolas de cores diferentes; na fusão, as costas se aproximam, uma linha de fronteira se desenha e a **ponte** (caminhos aceitos) se ergue; conflitos viram "zonas de disputa" até serem resolvidos.
+- **Som e tato:** dois instrumentos em harmonia; vibração dupla.
+- **Reduzido:** painel com a diferença entre territórios e aceite por região.
+- **Mede:** fusões concluídas; convites aceitos.
+
+---
+
+## 6. Direção de arte, movimento, som, tato e voz
+
+### 6.1 Direção de arte: "maquete e gravura"
+
+Dois estilos que se encontram:
+
+1. **Maquete tilt-shift:** o mundo 3D parece uma maquete fotografada de perto, com foco raso, luz de estúdio e escala miniatura.
+2. **Gravura geológica:** o corte estratigráfico, as curvas de nível, o papel e a tinta de uma carta litografada.
+
+**Materiais:** papel de grão fino, nanquim, bronze de bússola, vidro, arenito, basalto, ardósia, água rasa.
+
+**Pós-processamento (restrito e a serviço do dado):** profundidade de campo tilt-shift ligada à seleção, oclusão ambiente (GTAO) leve para dar peso ao relevo, névoa em camadas por altura, bloom apenas no magma, vinheta suave, granulação de papel quase imperceptível, classificação de cor (LUT) por estação e bioma.
+
+**Cores:** núcleo de seis (Maré, Calcário, Cobalto, Ocre, Isóbara, Alga) + paletas funcionais (estratos, rio, magma, neve, vegetação) que só aparecem quando carregam dado.
+
+**Tipografia:**
+- Bricolage Grotesque (interface e títulos), Newsreader (leitura e legendas), Martian Mono (coordenadas e escala).
+- **Rótulos de relevo** seguem a convenção cartográfica: letras mais espaçadas e largas para regiões maiores (eixo de largura variável mapeado à área da região), curvos acompanhando as curvas de nível (SDF).
+
+**Instrumentos em vez de barras de ferramentas:**
+- **Bússola funcional:** o Norte aponta para o **Farol** (objetivo ativo), não para um norte arbitrário.
+- **Escala semântica:** barra de escala no formato 1:N que indica o nível de zoom (marcos, regiões, continentes).
+- **Legenda:** o painel de camadas é desenhado como legenda de mapa.
+- **Lentes:** ferramentas intercambiáveis (seção 9.2).
+
+**Mascote:** não há mascote. O personagem é a **Agulha** da bússola; expressa estados só por movimento (pensando, certeza, dúvida, achado).
+
+### 6.2 Marca e identidade
+Identidade em dois estados: **tinta** (estática, papel) e **mundo** (movimento, relevo). O logotipo é um meridiano que se curva em uma curva de nível ao hover. Imagens sociais sempre mostram o terreno real da carta compartilhada.
+
+### 6.3 Linguagem de movimento: dois relógios
+
+| Relógio | Quando | Duração | Curva | Exemplos |
+|---|---|---|---|---|
+| **Humano** | Resposta a gesto e interface | 120 a 280 ms | Molas (rigidez alta, amortecimento médio) | Abrir painel, arrastar, hover, pouso da bandeira |
+| **Geológico** | Eventos do mundo | 1,2 a 4 s | Ease-in-out longo com inércia | Orogenia, névoa, maré, estação |
+
+Regras: nunca misturar relógios na mesma propriedade; eventos geológicos nunca bloqueiam o relógio humano (o usuário pode agir durante qualquer evento); um evento geológico por sessão no máximo em modo padrão.
+
+### 6.4 Som
+
+Padrão **desligado**; convite único e discreto para ligar ("Quer ouvir o mundo?").
+
+| Sistema | Timbre | Comportamento |
+|---|---|---|
+| Interface | Cliques de bronze e madeira | Curtos, afinados à escala do bioma |
+| Sedimentação | Areia granular | Densidade ∝ novidade |
+| Orogenia | Sub-grave + violoncelo harmônico | Cresce com a altura da serra |
+| Rios | Ruído filtrado | Filtro segue o fluxo |
+| Erosão | Vento suave | Aumenta em áreas com erosão alta |
+| Névoa | Pad aéreo | Abre ao dissipar |
+| Norte | Pad isóbara | Presença discreta durante respostas |
+
+Áudio **espacial** (pan e filtro por posição na tela), escalas generativas por bioma (pentatônica no Oceano, modal na Montanha), mixagem com compressão suave, tudo via AudioWorklet. **Sonificação do relevo** disponível como recurso de acessibilidade (tom ∝ altitude).
+
+### 6.5 Tato
+Padrões de vibração curtos e distintos: pouso (1 toque seco), orogenia (2 batidas), névoa revelada (rampa suave), erro (dois toques secos). Somente onde houver suporte; sempre desligável.
+
+### 6.6 Voz do Norte
+
+Cartógrafo curioso, direto, sempre mostrando a fonte. Nunca bajula, nunca encerra com "espero ter ajudado".
+
+| Situação | Sim | Não |
+|---|---|---|
+| Resposta | "Você decidiu manter o preço em março (marco *Reunião 12/03*). Em abril, um dado novo sugere rever (marco *Pesquisa de churn*)." | "Ótima pergunta! Com base em tudo..." |
+| Lacuna | "Você cita *regressão logística* em 7 marcos e nenhum a explica. Quer uma expedição curta?" | "Notei que talvez você precise estudar mais." |
+| Incerteza | "Só achei uma fonte. Confiança baixa." | "Acredito que provavelmente..." |
+| Erro | "Não consegui abrir o arquivo (PDF protegido). Envie uma versão sem senha." | "Ops! Algo deu errado." |
+| Erosão | "A *Serra da Evidência* está desgastando. 10 min a reerguem." | "Você está esquecendo seu conteúdo!" |
+
+---
+
+## 7. Sistema de design v2 (referência técnica)
+
+### 7.1 Tokens (CSS)
+
+```css
+@layer tokens {
+  :root {
+    /* Cor base (OKLCH). Pares claro/escuro via light-dark() */
+    --mare:     oklch(0.28 0.05 235);
+    --calcario: oklch(0.94 0.01 175);
+    --cobalto:  oklch(0.58 0.20 265);
+    --ocre:     oklch(0.77 0.15 82);
+    --isobara:  oklch(0.65 0.21 0);
+    --alga:     oklch(0.65 0.12 160);
+
+    color-scheme: light dark;
+    --bg:   light-dark(var(--calcario), var(--mare));
+    --fg:   light-dark(var(--mare), var(--calcario));
+    --acao: light-dark(var(--cobalto), color-mix(in oklch, var(--cobalto) 70%, white));
+    --norte: var(--isobara);
+
+    /* Dois relógios */
+    --t-humano-1: 120ms; --t-humano-2: 200ms; --t-humano-3: 280ms;
+    --t-geo-1: 1200ms;   --t-geo-2: 2400ms;   --t-geo-3: 4000ms;
+    --ease-geo: cubic-bezier(.65, 0, .25, 1);
+
+    /* Formas */
+    --raio-marco: 14px;       /* squircle onde houver suporte */
+    --raio-painel: 2px;       /* ferramentas: cantos quase retos */
+    --moldura: 1px double color-mix(in oklch, var(--fg) 40%, transparent);
+  }
+
+  /* Estações: ajustam luz e matiz do mundo inteiro */
+  [data-estacao="outono"] { --luz: oklch(0.86 0.09 75); --grade-cor: 'lut-outono'; }
+  [data-estacao="inverno"] { --luz: oklch(0.85 0.03 235); --grade-cor: 'lut-inverno'; }
+
+  /* Níveis de efeito: tudo em CSS e JS lê o mesmo atributo */
+  [data-fx="ultra"]     { --blur-vidro: 18px; --refracao: 1; }
+  [data-fx="alto"]      { --blur-vidro: 14px; --refracao: 0; }
+  [data-fx="equilibrado"] { --blur-vidro: 8px; --refracao: 0; }
+  [data-fx="economico"] { --blur-vidro: 0px;  --refracao: 0; }
+  [data-fx="estatico"]  { --blur-vidro: 0px;  --refracao: 0; --t-geo-1: 0ms; --t-geo-2: 0ms; --t-geo-3: 0ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-geo-1: 0ms; --t-geo-2: 0ms; --t-geo-3: 0ms; }
+}
+```
+
+### 7.2 Curvas de nível e lente (fragmento GLSL de referência)
+
+```glsl
+// h: altura normalizada em unidades de "domínio"; uInterval: espaçamento das curvas
+float h = texture(uHeight, vUv).r * uScale;
+
+// Lente topográfica: aumenta a densidade perto do cursor
+float lens = smoothstep(uLensRadius, uLensRadius * 0.6, distance(vWorldXZ, uCursorXZ));
+float interval = mix(uInterval, uInterval * 0.25, lens);
+
+// Distância à curva mais próxima, em unidades de altura
+float f  = fract(h / interval);
+float d  = min(f, 1.0 - f) * interval;
+float px = fwidth(h);                                  // largura de um pixel em altura
+float minor = 1.0 - smoothstep(0.0, px * uLineWidth, d);
+
+// Curva mestra a cada 5 intervalos
+float f5 = fract(h / (interval * 5.0));
+float d5 = min(f5, 1.0 - f5) * interval * 5.0;
+float major = 1.0 - smoothstep(0.0, px * uLineWidth * 1.8, d5);
+
+vec3 ink = mix(uInkMinor, uInkMajor, major);
+color = mix(color, ink, max(minor * 0.55, major));
+```
+
+### 7.3 Terreno: passes de GPU (WebGPU compute)
+
+1. **Splat:** cada marco espalha sua contribuição (núcleo gaussiano, σ ∝ coesão do agrupamento) na textura de altura.
+2. **Pinos:** aplica as intenções de "Esculpir".
+3. **Erosão:** multiplica por `E = 1 - (1 - R)^k`, com piso de 0,7, onde `R` é a retrievability média no tile.
+4. **Suavização:** blur separável conforme a escala semântica.
+5. **Normais e oclusão:** mapa de normais e oclusão barata.
+6. **Névoa:** máscara de ruído modulada por distância ao Farol e por densidade.
+7. **Rios:** splines relaxadas sobre o gradiente e rasterizadas por SDF.
+
+Pirâmide de tiles (256×256, R16F) para zoom semântico, com LOD por distância. Em WebGL2 o mesmo pipeline roda em passes de fragment com texturas de ponto flutuante; no nível Econômico, os tiles são servidos pré-renderizados.
+
+---
+
+## 8. Mapa de telas v2
+
+Legenda de prioridade: **P0** MVP, **P1** v1.0, **P2** depois. "Detalhe" indica onde a especificação aprofundada está (seção 9) ou herdada da v1.
+
+| ID | Tela | Bioma | Assinatura visual e de interação | Pri. | Detalhe |
+|---|---|---|---|---|---|
+| T01 | Landing "Travessia" | Oceano | Lente topográfica ao vivo; scroll que transforma oceano em território | P0 | 9.1 |
+| T02 | Recursos | Planície | Demos vivas por recurso (cada uma com mini-mundo) | P0 | v1 |
+| T03 | Experimente (sem conta) | Oceano | Cole um texto e veja nascer uma ilha, com embeddings no navegador | P0 | v1 + M1 |
+| T04 | Preços | Planície | "Tamanho do seu território" como calculadora | P0 | v1 |
+| T05 | Manifesto e Blog | Arquivo | Leitura com marginália e progresso por curva de nível | P1 | v1 |
+| T06 | Changelog | Arquivo | Linha da maré | P1 | v1 |
+| T07 | Ajuda e Docs | Planície | Glossário em linha e respostas do Norte | P1 | v1 |
+| T08 | Entrar | Oceano | Bússola aponta o método (passkey) | P0 | v1 |
+| T09 | Primeira terra | Oceano | M1: três perguntas moldam a ilha inicial | P0 | 9.3 |
+| T10 | Mesa e Nascer do sol | Planície | Painel de mudanças da noite; miniatura viva | P0 | 9.4 |
+| T11 | Campo | Planície | M2: captura que pousa no mapa | P0 | 9.5 |
+| T12 | Território | Montanha | O mundo vivo completo | P0 | 9.2 |
+| T13 | Prancheta | Estaleiro | Quadro infinito com guias magnéticas; arrastar marcos do mundo | P1 | v1 |
+| T14 | Editor de Marcos | Planície | Margem cartográfica; caminhos sugeridos; rios locais | P0 | v1 + nota |
+| T15 | Expedição | Planície/Estaleiro | Visão "Rota" sobre o relevo, mais Quadro e Tabela | P1 | v1 |
+| T16 | Biblioteca e Leitor | Planície | Fios de tinta entre fonte e anotação | P1 | v1 |
+| T17 | Busca e Comandos | Vidro | Mini-relevo em cada resultado; operadores | P0 | v1 |
+| T18 | Norte | Isóbara | M5: voo cinematográfico, agulha, UI generativa | P0 | 9.6 |
+| T19 | Reconhecimento | Planície | Cartas com física; terreno reerguendo ao concluir | P1 | v1 + M4 |
+| T20 | Rotas de estudo | Montanha | Trilha sobre o relevo com refúgios | P1 | v1 |
+| T21 | Acampamento | Floresta | Brasas como temporizador; baixa estimulação | P1 | 9.7 |
+| T22 | Reuniões e Voz | Estaleiro | Marcadores de decisão em tempo real | P1 | v1 |
+| T23 | Almanaque | Montanha/Arquivo | Perfis de elevação, marés e arquipélagos | P1 | v1 + Clima |
+| T24 | Diário e Maré | Arquivo | M8: gavetas de mapas e maré do tempo | P1 | v1 + M8 |
+| T25 | Sala de Expedição | Estaleiro | Silhuetas e rastros no mundo; seguir explorador | P1 | v1 |
+| T26 | Compartilhar e Publicar | Arquivo | M9: carimbo; pré-visualização dupla | P1 | v1 + M9 |
+| T27 | **Atlas Mundi** | Oceano | Planeta de cartas públicas; zoom até sua ilha | P1 | 9.8 |
+| T28 | Mercado de Modelos | Arquivo | Mapas dobráveis | P1 | v1 |
+| T29 | Perfil do cartógrafo | Oceano | Ilha-cartão 3D inclinável | P1 | v1 |
+| T30 a T35 | Notificações, Configurações, Integrações/MCP, Plano, Console, Migração | vários | Conforme v1; Configurações ganha Laboratório de aparência com mini-mundo ao vivo | P0/P1 | v1 |
+| T36 | Estados especiais | por área | A Agulha expressa vazio, erro e offline | P0 | v1 |
+| T37 | Mobile e PWA | Planície | Barra de gestos; Território em nível adequado | P0 | v1 |
+| T38 | Modo Maquete (AR) | Maquete | WebXR sobre a mesa | P2 | v1 |
+| T39 | **Turmas** | Planície | Névoa coletiva da turma; expedições do professor | P1 | 9.9 |
+| T40 | **Bússola de Decisão** | Isóbara/Planície | Opções pesadas por evidências do seu território | P1 | 9.10 |
+| T41 | **Expedição de Escrita** | Planície | Traçar uma rota no relevo e gerar o esqueleto do texto | P1 | 9.11 |
+| T42 | **Meu Ano em Relevo** | Maquete | M11 | P1 | 9.12 |
+| T43 | **Colheita** | Estação | M10, ritual sazonal | P1 | 9.13 |
+| T44 | **Fronteira** (fusão de territórios) | Estaleiro | M12, zonas de disputa | P2 | 9.14 |
+| T45 | **Lentes** | Instrumento | Contorno, Estratos, Rios, Tempo, Névoa, Pessoas, Clima | P0/P1 | 9.2 |
+| T46 | **Corte Estratigráfico** | Gravura | Fatia do terreno com camadas por época e tipo | P1 | 9.2 |
+| T47 | Widgets e tela de bloqueio | Instrumento | "Terreno do dia" e captura rápida | P2 | 9.15 |
+
+---
+
+## 9. Especificações aprofundadas
+
+### 9.1 T01 Landing "Travessia"
+
+**Objetivo:** em 20 segundos, a pessoa sente (não apenas entende) que o conhecimento pode ser um lugar.
+
+**Roteiro de scroll (5 atos, um por ideia real, sem numeração decorativa):**
+
+| Ato | Cena | O que acontece |
+|---|---|---|
+| Caos | Oceano com bolhas de texto soltas | O visitante digita uma ideia no campo "Anote qualquer coisa"; ela vira bandeira (M2 em miniatura) |
+| Terra | Ilhas emergem do oceano | Mais ideias sedimentam; costa e curvas se formam (M1) |
+| Névoa | Parte do mapa some em neblina | O texto aponta: "o que você ainda não sabe também tem forma" (M4) |
+| Norte | A agulha gira e voa até uma serra | Exemplo de pergunta ao Norte com citações (M5) |
+| Juntos | Duas ilhas se aproximam | Fronteira e Atlas Mundi (M12) |
+
+**Técnica:** GSAP ScrollTrigger orquestrando uma cena R3F (câmera e parâmetros de shader por progresso), Lenis, shader TSL de oceano e relevo, pôster pré-renderizado imediato, lente topográfica (M6) no hero.
+
+**Fallbacks:** versão estática por ato em WebP/AVIF, sem WebGL; o conteúdo textual é semântico e completo sem JavaScript.
+
+**Aceite:** LCP < 2,5 s (pôster antes da cena 3D); 60 fps em aparelho intermediário; nota de acessibilidade 95 ou mais; o campo "Anote qualquer coisa" funciona sem a cena.
+
+### 9.2 T12 Território, T45 Lentes e T46 Corte
+
+**O Território é o produto.** Entra em P0 já com sedimentação, curvas, lente de Contorno e Névoa; os demais sistemas entram por fase (seção 14).
+
+**Lentes (T45)** são ferramentas ativas sobre o mundo; uma ou duas ativas ao mesmo tempo:
+
+| Lente | O que mostra | Atalho | Fase |
+|---|---|---|---|
+| **Contorno** | Densidade de curvas e inclinação; prévias de marcos sob a lente | `1` | P0 |
+| **Névoa** | Terra incógnita, distância ao Farol, caminhos sugeridos para revelar | `2` | P0 |
+| **Estratos** | Camadas por época e tipo (abre o Corte) | `3` | P1 |
+| **Rios** | Proveniência e dependência de qualquer marco selecionado | `4` | P1 |
+| **Tempo** | Maré: o território em qualquer data | `5` | P1 |
+| **Pessoas** | Onde cada colaborador atua (silhuetas, rastros) | `6` | P1 |
+| **Clima** | Contexto atual, trocas de contexto, ondas na costa | `7` | P1 |
+
+**Interações do Território:**
+- Navegação por mouse, toque, caneta e teclado (setas para rumos N/S/L/O e `Tab` para o próximo marco por proximidade).
+- **Zoom semântico** com a escala 1:N na régua: de longe, regiões e continentes; de perto, marcos e texto.
+- **Esculpir:** pinça para cima ou pincel com pressão altera a altitude como intenção.
+- **Voz:** "Norte, leve-me ao que escrevi sobre preços" move a câmera em voo curto.
+- **Modo Cinema:** câmera automática para apresentações (regras de corte, horizonte estável, sem rolagem de câmera).
+- Painel lateral ancorado (CSS Anchor Positioning) ao marco selecionado.
+
+**Corte Estratigráfico (T46):** ao arrastar uma linha sobre o mapa, abre-se uma fatia no estilo de gravura geológica. As camadas aparecem coloridas por tipo e época; compactações e discordâncias (períodos sem atividade) ficam visíveis. Útil para ver como um tema se formou.
+
+**Equivalente textual (obrigatório):** "Visão em lista" e "Visão em árvore" com a mesma seleção e todos os filtros; **narração do terreno** pelo Norte ("Você está na Serra da Evidência, 14 marcos, altitude alta, erosão leve").
+
+**Aceite:** 60 fps com 5.000 marcos (nível Alto); abertura em 1,5 s com 2.000 marcos em visita recorrente; todas as ações disponíveis na lista; sem enjoo (sem rolagem de câmera, horizonte estável, vinheta opcional de conforto).
+
+### 9.3 T09 Primeira terra (onboarding)
+
+Três perguntas, cada uma transforma a paisagem (M1):
+
+1. **"O que você quer dominar?"** → nome e primeira ilha.
+2. **"De onde vêm suas fontes?"** → rios iniciais e costa de importação.
+3. **"Como você prefere trabalhar?"** → estação e clima iniciais; escolhe o nível de efeitos com uma demonstração (a pessoa escolhe o que *vê* funcionar melhor).
+
+O território inicial nasce com 5 a 8 marcos de exemplo reais (úteis, não "lorem ipsum"), uma região e um Farol. **Tempo até o primeiro uau ≤ 90 s.**
+
+### 9.4 T10 Mesa e Nascer do sol
+
+- **Nascer do sol:** uma folha curta (≤ 2 min de leitura) com: o que mudou durante a noite (erosão leve, novos rios, sugestões), a névoa mais próxima do Farol, e *uma* ação sugerida com tempo estimado.
+- **Miniatura viva do território** ao centro, que gira devagar apenas quando está em foco.
+- Pilha de Campo, carta do Reconhecimento do dia, retomar de onde parou.
+- **Aceite:** carrega do cache local em < 1 s; a folha do Nascer do sol é gerada em lote (pré-calculada) para abrir instantânea.
+
+### 9.5 T11 Campo (captura)
+
+- Barra flutuante em vidro de bússola, atalho global e gesto no mobile.
+- **M2** em cada captura; fila local e modo offline com selo "pendente".
+- Entradas: texto, voz, link (extração automática), imagem, arquivo, clipe de web (extensão), e-mail e mensagens (integrações).
+- **Classificação sempre opcional**; o Norte sugere região e caminhos depois, nunca antes.
+
+### 9.6 T18 Norte
+
+- Painel lateral, tela cheia e comando inline.
+- **M5** como padrão (com versão reduzida).
+- **UI generativa:** respostas podem incluir mini-mapas, linhas do tempo, tabelas e cartas de estudo interativas, a partir de um registro fechado de componentes.
+- **Modos:** pesquisa, revisão crítica, advogado do diabo, tutor socrático.
+- **Confiança visível:** a agulha tem movimento de certeza (firme) ou dúvida (oscila); botão "ver como cheguei nisso".
+- **Fronteira de confiança:** respostas só com fontes do usuário por padrão; conhecimento geral é opt-in e marcado visualmente.
+- **Segurança:** conteúdo importado é tratado como dado, nunca como instrução; ações de escrita sempre reversíveis.
+
+### 9.7 T21 Acampamento
+
+- Escuridão suave; o foco é uma fogueira cujas brasas diminuem com o tempo; sons ambientes opcionais; partículas lentas em shader.
+- **Modo baixa estimulação:** sem partículas e sem som, contraste suave.
+- Wake Lock, notificações silenciadas quando possível; saída sempre por uma tecla.
+- Ao terminar, o território do tema trabalhado ganha altitude (M4 curto).
+
+### 9.8 T27 Atlas Mundi
+
+**O que é:** todas as cartas públicas costuradas em **um planeta** explorável. Continentes são grandes áreas do saber (derivados dos embeddings agregados), ilhas são cartas, arquipélagos são coleções.
+
+- **Zoom contínuo:** do espaço (continentes e oceanos) até a carta de uma pessoa, e, se for o seu, até o seu território.
+- **Costas e fronteiras** emergem de similaridade entre cartas (não de uma taxonomia manual).
+- **Expedições públicas:** o Norte monta roteiros pelo atlas ("do básico de estatística até inferência causal em 10 cartas").
+- **Curadoria:** coleções humanas e algorítmicas; moderação e denúncias.
+- **Técnica:** R3F, instanciamento de dezenas de milhares de ilhas, LOD por distância, tiles do planeta pré-calculados, busca semântica, versão em lista como padrão em aparelhos fracos.
+- **Privacidade:** só aparece o que foi publicado; despublicar retira a ilha em até 60 s.
+- **Aceite:** abertura em < 3 s; 30 fps em aparelhos intermediários; acesso completo por lista, busca e teclado.
+
+### 9.9 T39 Turmas (educação)
+
+- **Para quem:** professores, mentores, bootcamps, grupos de pesquisa.
+- **O que faz:** cada aluno tem seu território; a turma tem um **território-guia** do professor. O professor vê uma **névoa coletiva** (áreas em que muitos alunos ainda não chegaram) e pode lançar **expedições** (roteiros) para a turma.
+- **Privacidade por design:** o aluno decide o que compartilha; vê exatamente o que o professor vê; nenhum ranking entre alunos; dados agregados por padrão.
+- **Menores de idade:** exigem consentimento do responsável e regras específicas da LGPD para dados de crianças e adolescentes; configuração de contas por instituição.
+- **Valor:** sinaliza onde a turma está perdida *antes* da prova.
+- **Aceite:** o aluno tem um botão "ver o que o professor vê" e pode sair da turma a qualquer momento levando seus dados.
+
+### 9.10 T40 Bússola de Decisão
+
+- A pessoa descreve uma decisão e as opções. O Norte busca no território **evidências a favor e contra**, decisões passadas parecidas ("em outubro você decidiu algo semelhante") e premissas não verificadas (névoa sobre a decisão).
+- **Saída:** matriz de evidências com citações, riscos conhecidos e **registro de decisão** (Carta de Navegação) com data para revisão futura ("revisar em 90 dias").
+- **Valor:** transforma anotações em decisões melhores e cria memória institucional para times.
+
+### 9.11 T41 Expedição de Escrita
+
+- Em vez de começar com a página em branco, a pessoa **traça uma rota** sobre o relevo passando por marcos que quer usar.
+- O Norte gera o **esqueleto** (títulos, ordem de argumento, citações posicionadas), e o editor abre dividido em tela: esqueleto à esquerda, trechos-fonte à direita.
+- Cada parágrafo mantém **rio de proveniência** para as fontes; ao publicar, a bibliografia sai pronta.
+- **Aceite:** o texto final sempre exige a edição humana (o Norte propõe, a pessoa escreve); nenhum trecho é inserido sem citação visível.
+
+### 9.12 T42 Meu Ano em Relevo
+
+- M11 em formato vertical (9:16) e horizontal; exportação em vídeo curto e em imagem.
+- Estatísticas **sem comparação social** ("3 serras nasceram", "14 áreas reerguidas", "2 costas descobertas", "tema mais profundo do ano").
+- Compartilhar mostra um mapa real, nunca conteúdo privado; a pessoa escolhe o que aparece (nomes de região podem ser ocultados).
+- É o principal laço viral do produto.
+
+### 9.13 T43 Colheita
+
+- Ritual sazonal em tela cheia (M10).
+- Etapas: ver as áreas que "frutificaram"; escolher marcos-chave; o Norte propõe a síntese; gerar a **carta da estação**; revisar o Farol seguinte.
+- Pode ser concluída em 20 minutos ou estendida a 2 horas.
+
+### 9.14 T44 Fronteira (fusão de territórios)
+
+- Duas pessoas ou times fundem partes de seus territórios (M12).
+- **Diff por região:** o que é novo, o que é duplicado, o que conflita ("zonas de disputa").
+- **Permissões:** cada lado escolhe o que entrega; fusão reversível por 30 dias.
+- **Caso de uso:** onboarding de pessoa nova, fusão de times, mentoria ("me emprestar seu mapa de..."), projetos entre empresas.
+
+### 9.15 T47 Widgets e tela de bloqueio (P2)
+
+- **Terreno do dia:** miniatura estática com o Farol e a névoa mais próxima; toque abre a Mesa.
+- **Captura rápida:** atalho de voz e texto.
+- **Reconhecimento:** o card do dia.
+- Disponível via PWA onde suportado e no empacotamento nativo (fase 5).
+
+---
+
+## 10. Tecnologia
+
+### 10.1 Princípios técnicos
+1. **Simulação separada da renderização.** O mundo é dado; a tela é uma projeção.
+2. **Determinismo.** Mesma sequência de eventos, mesmo mundo, em qualquer dispositivo.
+3. **Local primeiro.** Tudo abre e funciona offline; a nuvem sincroniza e amplia.
+4. **Degradar com elegância.** Cinco níveis de qualidade e um equivalente textual sempre.
+5. **Medir tudo.** Orçamentos de quadros e de bytes verificados em cada PR.
+
+### 10.2 Módulos próprios
+
+| Módulo | Responsabilidade | Tecnologia |
+|---|---|---|
+| `world-sim` | Sedimentação, tectônica, erosão, hidrologia, clima, estações, névoa; determinístico | Rust compilado para WASM, executado em Worker |
+| `terrain-gpu` | Passes de compute, tiles, malha, pós-processamento, rios | WebGPU (TSL) com fallback WebGL2 |
+| `lens` | Ferramentas de lente e shaders associados | TSL/GLSL |
+| `cinema` | Câmera cinematográfica e regras de corte | TypeScript + R3F |
+| `sonic` | Paisagem sonora e sonificação | Web Audio, AudioWorklet, Tone.js |
+| `semantic` | Embeddings, projeção estável, similaridade | Transformers.js (local) e serviço (remoto); UMAP com âncoras |
+| `ds` | Tokens, componentes, instrumentos de interface | React 19, Tailwind v4, Base UI/Radix, Storybook |
+
+### 10.3 Modelo de threads
+
+```mermaid
+flowchart LR
+  subgraph Principal
+    UI[React 19 + TanStack Router]
+    ST[TanStack Store: câmera, lentes, tempo]
+  end
+  subgraph Workers
+    SIM[world-sim WASM]
+    RND[Render OffscreenCanvas: WebGPU]
+    SEM[Embeddings + projeção]
+    AUD[AudioWorklet]
+  end
+  subgraph Dados
+    LDB[(TanStack DB: OPFS/SQLite)]
+    SRV[TanStack Start + Postgres/pgvector]
+  end
+  LDB -- registro de eventos --> SIM
+  SIM -- snapshots do mundo --> RND
+  SIM -- eventos geológicos --> UI
+  SEM --> SIM
+  UI <--> ST
+  ST --> RND
+  SIM --> AUD
+  LDB <--> SRV
+```
+
+**Orçamento de quadro (16,6 ms, nível Alto):** simulação incremental ≤ 2 ms, compute ≤ 3 ms, render ≤ 8 ms, interface ≤ 3 ms, margem ≥ 0,6 ms.
+
+### 10.4 Uso do TanStack (com intenção de produto)
+
+| Pacote | Uso |
+|---|---|
+| **Start** | SSR e streaming das páginas públicas; **cartas públicas** servidas com **tiles de altura e normais pré-renderizados** (a página mostra o terreno instantaneamente como imagem e hidrata para 3D); funções de servidor para Norte, importação e publicação; rotas de servidor para OG dinâmico e MCP |
+| **Router** | Estado do mundo na URL: câmera (comprimida), lentes ativas, data da Maré, filtros; links compartilháveis ("veja esta serra, em março, com a lente Rios"); pré-carregamento por intenção; transições de visão entre mapa e editor |
+| **Query** | Chamadas ao servidor, atualizações otimistas, paginação |
+| **DB** | Registro de eventos e consultas ao vivo que alimentam o `world-sim`; mutações otimistas; sincronização |
+| **Store** | Estado efêmero de alta frequência (câmera, lente, cursor) com seletores para evitar re-render |
+| **Pacer** | Throttle da câmera para a URL, debounce de busca, fila de captura offline |
+| **Table e Virtual** | Visão tabela das Expedições, console e listas longas |
+| **Form** | Formulários tipados com Standard Schema |
+| **AI** | Camada de streaming e ferramentas do Norte, com provedores intercambiáveis |
+| **Devtools** | Depuração de rotas, cache, DB e, com plugin próprio, **inspetor do mundo** (eventos, camadas, tempo por pass) |
+
+> Pacotes jovens do ecossistema podem estar em RC, beta ou alfa. A fase 0 inclui revisão de maturidade e camadas de adaptação finas.
+
+### 10.5 Qualidade adaptativa
+
+| Nível | Quando | Terreno | Efeitos | Som |
+|---|---|---|---|---|
+| **Ultra** | GPU forte, desktop, bateria cheia | WebGPU, tilt-shift, GTAO, clima volumétrico, refração | Todos | Completo |
+| **Alto** | Padrão atual de desktop | WebGPU/WebGL2, sem refração | Quase todos | Completo |
+| **Equilibrado** | Notebooks e celulares recentes | Densidade menor, sem física | Reduzidos | Básico |
+| **Econômico** | Aparelho fraco, economia de bateria ou dados | 2D com curvas pré-renderizadas | Mínimos | Desligado |
+| **Estático** | `prefers-reduced-motion`, falha de GPU | Imagens, lista e árvore | Nenhum | Desligado |
+
+Escolha automática por `detect-gpu`, medição do orçamento de quadros em execução (reduz de nível se cair de 50 fps por 3 s), `Save-Data` e preferências do sistema; sempre com controle manual no Laboratório de aparência.
+
+### 10.6 Performance e bytes
+
+| Item | Meta |
+|---|---|
+| LCP landing (4G, aparelho intermediário) | < 2,5 s (pôster antes da cena) |
+| LCP app (visita recorrente) | < 1,2 s |
+| INP p75 | < 200 ms |
+| CLS | < 0,05 |
+| JS inicial público | ≤ 170 KB gzip, 3D sob demanda |
+| JS inicial app | ≤ 250 KB gzip |
+| Território | 60 fps com 5.000 marcos (Alto); 30 fps com 20.000 (Equilibrado) |
+| Atlas Mundi | 30 fps com 50.000 ilhas instanciadas (Alto) |
+| WASM do `world-sim` | ≤ 600 KB comprimido |
+| Memória do Território | ≤ 400 MB em desktop; ≤ 180 MB em celular |
+
+### 10.7 Dados e IA (resumo)
+- PostgreSQL com pgvector; Drizzle; armazenamento de objetos com URLs assinadas e upload retomável; Yjs com Durable Objects para texto e prancheta; fila de jobs para PDF, embeddings, importação e geração de tiles.
+- **Pipeline do mapa:** embedding → projeção estável com âncoras (histerese) → eventos → simulação → snapshots por tile.
+- **Norte:** consulta → recuperação híbrida → reranqueamento → resposta com citações → validação (cada citação existe) → registro de ações com desfazer.
+- **Avaliação contínua:** conjuntos de perguntas de referência medindo fidelidade às fontes, recuperação e latência.
+- **Privacidade:** embeddings locais quando possível; "somente local" disponível; sem treinamento com dados do usuário; criptografia por território (E2E em P2).
+
+### 10.8 Ferramentas de qualidade
+- Vitest, Testing Library, Playwright, axe-core, regressão visual por componente e por cena (capturas determinísticas do mundo com *seed* fixa), Lighthouse CI, **harness de desempenho** em aparelhos de referência (um fraco, um intermediário, um forte, um celular de entrada).
+- Testes de propriedade para o `world-sim` (determinismo, monotonicidade, piso da erosão).
+
+---
+
+## 11. Acessibilidade e conforto (melhorias v2)
+
+| Tema | Decisão |
+|---|---|
+| **Equivalentes** | Todo o mundo existe como lista, árvore, tabela e **narração do terreno** pelo Norte |
+| **Navegação por rumos** | Setas movem por N/S/L/O; `Tab` vai ao marco mais próximo; atalhos `1` a `7` trocam de lente |
+| **Sonificação** | Tom ∝ altitude e timbre por tipo; útil também como recurso sensorial para pessoas com baixa visão |
+| **Háptica** | "Bússola tátil" no mobile: vibração mais forte ao apontar para o Farol |
+| **Conforto de movimento** | Sem rolagem de câmera, horizonte estável, vinheta opcional, velocidade máxima de câmera, "Modo sem enjoo" |
+| **Fotossensibilidade** | Nenhum conteúdo pisca mais de 3 vezes por segundo; brilho de magma tem limite de luminância |
+| **Preferências do sistema** | `prefers-reduced-motion`, `prefers-contrast`, `prefers-reduced-transparency`, `forced-colors` |
+| **Daltonismo** | Rampas de altitude e rios verificados; redundância por textura e rótulo |
+| **Cognição** | Modo calmo (sem eventos geológicos, sem som, sem clima), linguagem simples, rituais pulavéis |
+| **Conformidade** | WCAG 2.2 AA, testes com NVDA, VoiceOver e TalkBack, testes com pessoas usuárias de tecnologia assistiva desde a Prova de Beleza |
+
+---
+
+## 12. Crescimento e economia
+
+### 12.1 Laços de crescimento
+
+| Laço | Mecânica | Métrica |
+|---|---|---|
+| **Meu Ano em Relevo** | Vídeo compartilhável que mostra um mundo real; link leva à demo | Visitantes por compartilhamento |
+| **Cartas públicas** | Cada carta tem URL, imagem social com o terreno real e SEO | Visitas orgânicas; conversão de visitante em demo |
+| **Atlas Mundi** | Descoberta e SEO por tema; cartas viram portas de entrada | Entrada via Atlas |
+| **Turmas** | Professor traz a turma; alunos levam o hábito | Alunos por professor; retenção após o curso |
+| **Fronteira e colaboração** | Convites para fundir ou explorar juntos | Convites aceitos |
+| **Demo sem conta** | Mini-território com embeddings no navegador | Conversão demo → cadastro |
+
+### 12.2 Planos (hipóteses)
+
+| Plano | Para quem | Preço inicial | Inclui |
+|---|---|---|---|
+| **Poeira** | Experimentar | Grátis | 1 território, 500 marcos, Norte limitado, Reconhecimento, exportação total |
+| **Estrela** | Uso individual | R$ 39/mês | Ilimitado, Norte ampliado, Expedição de Escrita, Bússola de Decisão, Maré completa, publicação, domínio |
+| **Galáxia** | Times | R$ 29/usuário/mês | Colaboração, Fronteira, permissões por região, auditoria |
+| **Turmas** | Educação | R$ 9 por aluno/mês (mín. 20), professor grátis | Território-guia, névoa coletiva, expedições, relatórios |
+| **Universo** | Empresas | Sob consulta | SSO, SCIM, residência de dados, SLA |
+
+Também: cartas pagas (assinatura de leitores com repasse), mercado de modelos, desconto estudante. Nunca bloquear exportação; Pix, cartão e boleto; sem anúncios.
+
+---
+
+## 13. Métricas
+
+### 13.1 Métrica estrela
+**Conhecimento Reutilizado Semanal (CRS):** marcos com mais de 14 dias reabertos, citados, conectados ou usados em resposta do Norte, por usuário ativo semanal.
+
+### 13.2 Métricas do "Mundo Vivo"
+
+| Métrica | Definição | Meta inicial |
+|---|---|---|
+| **Tempo até o primeiro uau (TTFW)** | Do cadastro ao M1 concluído | ≤ 90 s |
+| **Taxa de reerguimento** | Áreas erodidas revisitadas em até 7 dias | 40% |
+| **Taxa de revelação** | Áreas sob névoa reveladas por mês | 2 por usuário ativo |
+| **Orogenias por usuário/mês** | Conexões interdisciplinares aceitas | 1 |
+| **Uso de lentes** | Sessões com pelo menos uma lente além de Contorno | 35% |
+| **Uso do Norte com citações** | Respostas com clique em citação | 50% |
+| **Compartilhamento do Ano** | Percentual de usuários que compartilham M11 | 25% |
+| **Conforto** | Relatos de desconforto em testes de uso | < 2% |
+
+### 13.3 Qualidade e produto
+- Ativação: 10 marcos, 1 caminho aceito e 1 pergunta ao Norte em 48 h (meta 50%).
+- Retenção semana 4: 38%. Conversão em 60 dias: 6%.
+- INP < 200 ms; fps dentro do orçamento por nível; zero violação crítica no axe nos fluxos principais.
+
+### 13.4 Experimentação
+Testes A/B de intensidade de efeitos, de frequência de momentos uau (1 por sessão vs. 2), de textos do Nascer do sol e de limiares da orogenia. Toda experiência com efeito geológico é medida também por **retenção e conforto**, não só por engajamento.
+
+---
+
+## 14. Roadmap com portão de decisão
+
+### Fase 0, Prova de Beleza (6 semanas) → **Go/No-Go**
+
+**Entrega:** um **vertical slice** jogável do Território com dados reais de 12 voluntários:
+- 2.000 marcos reais; sedimentação (M2), curvas de nível, Lente de Contorno (M6), Névoa (M4) e uma orogenia (M3);
+- Norte com citações e "Mostre-me no mapa" (M5, versão simples);
+- Visão em lista e narração do terreno;
+- Rodando em 4 aparelhos de referência.
+
+**Critérios de saída (todos obrigatórios):**
+
+| Critério | Meta |
+|---|---|
+| Desempenho | 60 fps (Alto) em desktop de referência; 30 fps em celular intermediário |
+| Desejabilidade | ≥ 9 de 12 dizem que usariam de novo e descrevem um uso concreto |
+| Compreensão | ≥ 10 de 12 explicam o que significa a névoa e a altitude sem ajuda |
+| Utilidade | Mediana de 3 achados úteis por pessoa ("reencontrei X") em 30 minutos |
+| Conforto | Nenhum caso de enjoo; ajuste de conforto eficaz |
+| Acessibilidade | Tarefa principal concluída por 3 pessoas que usam leitor de tela, pela lista e narração |
+| Estabilidade do mapa | Posições estáveis entre sessões (deslocamento médio abaixo do limite definido) |
+
+**Se não passar:** pivotar para "mapa 2D com camadas" (o conceito sobrevive; o custo de engine cai) ou reavaliar a tese.
+
+### Fase 1, MVP "Big Bang" (12 semanas)
+T01, T03, T08, T09, T10, T11, T12 (sedimentação, tectônica, névoa, lentes Contorno e Névoa), T14, T17, T18, T36, T37, T45 (parcial), offline e sincronização, importação de Markdown, Laboratório de aparência básico.
+
+### Fase 2, Alfa fechado (8 semanas)
+Erosão e Reconhecimento (M4 completo), Rios (M7), Biblioteca e Leitor, Expedição (Quadro, Tabela e Rota), Acampamento, Nascer do sol completo, Almanaque básico, Maré (M8) em versão simples. 100 usuários convidados.
+
+### Fase 3, Beta público (12 semanas)
+Colaboração ao vivo, Prancheta, Compartilhar e Publicar (M9), **Atlas Mundi**, Corte Estratigráfico, Clima, Estações e Colheita (M10), Expedição de Escrita, Bússola de Decisão, cobrança com Pix, primeiros times.
+
+### Fase 4, Lançamento geral
+**Turmas**, **Meu Ano em Relevo** (M11), Fronteira (M12), Mercado de Modelos, integrações, Reuniões, MCP, console completo.
+
+### Fase 5, Expansão
+Modo Maquete (AR), widgets e nativo, SSO/SCIM, residência de dados, E2E, novos idiomas, cartas pagas.
+
+---
+
+## 15. Riscos, ética e privacidade
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| O mundo vivo vira "brinquedo" e não ajuda a trabalhar | Média | Alto | Regra de ouro (nada decorativo); Prova de Beleza mede utilidade; lista e 2D como primeira classe |
+| Erosão causa culpa ou ansiedade | Média | Alto | Piso de 70%, nunca apaga, permafrost, pausa global, linguagem não punitiva, modo calmo |
+| Mapa instável confunde | Média | Alto | Projeção com âncoras e histerese; "Congelar mapa"; teste de estabilidade na fase 0 |
+| Desempenho ruim em aparelhos fracos | Alta | Alto | Cinco níveis, orçamentos por PR, aparelhos de referência no CI |
+| Enjoo e desconforto visual | Média | Alto | Câmera sem rolagem, horizonte estável, vinheta, modo sem enjoo; testes com usuários |
+| Custo e complexidade do motor próprio | Alta | Alto | Prova de Beleza como portão; módulos pequenos; fallback para 2D |
+| Alucinação do Norte | Média | Alto | Citações validadas, só fontes do usuário por padrão, confiança visível |
+| Custo de IA | Média | Médio | Embeddings locais, cache semântico, limites por plano |
+| Pacotes jovens mudam de API | Alta | Médio | Camadas de adaptação, versões fixas, revisão trimestral |
+| Turmas e menores de idade | Média | Alto | Consentimento do responsável, privacidade por design, auditoria legal antes do lançamento |
+| Atlas Mundi com conteúdo impróprio ou plágio | Média | Alto | Moderação, denúncias, detecção de cópia, política clara de remoção |
+| Sincronização e conflitos | Média | Alto | CRDT para texto e prancheta; eventos ordenados para o mundo; testes de caos |
+| Complexidade de escopo | Alta | Médio | Fases com portão; P0/P1/P2 rígidos; um uau por vez |
+
+**Princípios éticos:**
+- Sem dark patterns, sem sequências punitivas, sem rankings por padrão.
+- Dados de clima e contexto são locais por padrão e desligáveis.
+- Exportação total sempre disponível, em qualquer plano.
+- LGPD: consentimento granular, exportação e exclusão completas, DPO, regras específicas para crianças e adolescentes.
+- IA: sem treinamento com dados do usuário; retenção mínima nos provedores.
+
+---
+
+## 16. Critérios globais de aceite
+
+Uma tela ou recurso só está pronto quando:
+
+1. Cumpre os critérios da sua especificação e **a tabela da regra de ouro** (cada efeito mapeia para um dado).
+2. Tem estados de carregamento (esqueleto fiel), vazio, erro recuperável e offline.
+3. É 100% operável por teclado, tem equivalente textual e passa em axe, com revisão manual dos fluxos principais.
+4. Respeita `prefers-reduced-motion` e os cinco níveis de qualidade; todo momento uau tem versão reduzida.
+5. Cumpre os orçamentos de desempenho e de memória.
+6. Funciona em Chromium, Safari e Firefox atuais, com degradação planejada, de 360 px a 4K.
+7. Usa o vocabulário e a voz do Norte e está traduzido.
+8. Tem telemetria mínima e revisada em privacidade.
+9. Tem testes proporcionais ao risco (inclui testes determinísticos do mundo).
+10. Foi revisado por design (bioma, tokens, movimento de dois relógios, anti-clichês) e engenharia (arquitetura, segurança).
+
+---
+
+## 17. Questões em aberto
+
+1. **Prova de Beleza:** quem são os 12 voluntários e que dados reais usaremos? (Define a representatividade do teste.)
+2. **Motor:** Rust/WASM para o `world-sim` desde o início ou TypeScript até validar a tese?
+3. **Projeção:** UMAP com âncoras basta para estabilidade, ou investigar projeções paramétricas aprendidas?
+4. **Atlas Mundi:** como derivar continentes de forma estável e justa sem taxonomia manual?
+5. **Turmas:** parceiro piloto (escola, cursinho, universidade) e modelo de contrato.
+6. **Prancheta:** engine própria sobre PixiJS ou SDK existente (custo, licença, extensibilidade)?
+7. **Marca:** busca de anterioridade e domínios para "Meridiano".
+8. **Fronteira e E2E:** como fundir territórios criptografados de ponta a ponta?
+9. **Som:** contratar compositor e designer de som desde a fase 1?
+10. **Direção de arte:** contratar estúdio externo para o sistema de materiais e as cenas-chave?
+
+---
+
+## Anexo A. Banco de textos (voz da interface)
+
+| Contexto | Texto |
+|---|---|
+| Campo vazio | "Anote qualquer coisa. O mapa descobre onde ela cai." |
+| Captura enviada | "Guardado. Caiu perto de *Estatística aplicada*." |
+| Offline | "Sem conexão. Suas alterações estão salvas neste dispositivo e serão enviadas quando voltar." |
+| Erosão (convite) | "Esta serra está desgastando. 10 minutos a reerguem." |
+| Névoa | "Terra incógnita ao norte: *inferência causal*. Quer uma expedição de 25 minutos?" |
+| Orogenia | "Duas áreas se uniram. Nasce a *Serra da Evidência*. Quer registrar o que as conecta?" |
+| Publicação | "Publicado. Sua carta já está no ar." |
+| Despublicar | "Despublicado. A carta sai do ar em até 1 minuto." |
+| Erro de arquivo | "Não consegui abrir este PDF (protegido por senha). Envie uma versão sem senha." |
+| Exportar | "Exportar tudo: seus marcos, caminhos e arquivos, em formatos abertos." |
+| Pausar erosão | "Erosão pausada. O relevo fica como está até você retomar." |
+| Fim do Acampamento | "Sessão concluída: 50 minutos em *Modelos de preço*. O relevo subiu 3 m." |
+
+## Anexo B. Glossário técnico
+
+| Termo | Significado |
+|---|---|
+| **Retrievability** | Probabilidade estimada de lembrar um item agora (modelo FSRS) |
+| **Orogenia** | Formação de cordilheiras por colisão de placas; aqui, conexão entre áreas distantes |
+| **Tilt-shift** | Efeito de foco raso que faz cenas parecerem maquetes |
+| **GTAO** | Oclusão ambiente baseada em horizonte, de baixo custo |
+| **TSL** | Linguagem de shaders do Three.js para WebGPU/WebGL |
+| **SDF** | Campo de distância assinada, usado para texto e rios nítidos em qualquer escala |
+| **CRDT** | Estrutura de dados para edição simultânea sem conflitos |
+| **MCP** | Protocolo aberto para assistentes de IA acessarem ferramentas e dados |
+
+---
+
+*Próximos passos: aprovar a Prova de Beleza (seção 14), definir os 12 voluntários e os aparelhos de referência, e iniciar o protótipo do Território com o `world-sim` mínimo (sedimentação, tectônica, névoa).*
