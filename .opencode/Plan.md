@@ -1,5 +1,7 @@
 opencode como runtime vs projeto real como criação
 
+*O setup deve estar completo e intacto em dev-server com todo o repositorio*
+
 # dev-server/.opencode/project+(N) - dev-server/.opencode/prd-project+(N) - dev-server/.opencode/roadmap-proj+(N)
 
 1- Sempre verificar se o opencode está configurado e funcionando antes de iniciar qualquer projeto (a menos que o usuário pro ativamente e explicitamente peça explicitamente para pular a verificação)
